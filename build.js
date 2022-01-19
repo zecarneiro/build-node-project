@@ -12,7 +12,7 @@ const main = () => {
     path: null,
     os: null,
   };
-  var isVerbose = false;
+  var pwd = process.cwd();
 
   /**
   * 
@@ -62,9 +62,9 @@ const main = () => {
     exit(1);
   }
 
-  const BIN_PATH = packages.path.resolve(__dirname, '..', 'dist');
+  const BIN_PATH = packages.path.resolve(pwd, 'dist');
   const BIN_NAME = 'index.js';
-  const EXCLUDE_RULE = [packages.path.resolve(__dirname, '..', 'node_modules')];
+  const EXCLUDE_RULE = [packages.path.resolve(pwd, 'node_modules')];
   const EXTENSIONS = ['ts', 'js'];
 
   var exeCmd = (cmd, args, verbose) => {
@@ -90,7 +90,7 @@ const main = () => {
     const config = {
       target: 'node',
       mode: mode,
-      entry: packages.path.resolve(__dirname, '..', entryPoint),
+      entry: packages.path.resolve(pwd, entryPoint),
       output: {
         path: binPath,
         filename: binName,
@@ -130,7 +130,7 @@ const main = () => {
 
   var lintFix = (fixPath, ext, verbose) => {
     if (fixPath) {
-      fixPath = packages.path.resolve(__dirname, '..', fixPath);
+      fixPath = packages.path.resolve(pwd, fixPath);
       exeCmd('npx', ['eslint', fixPath, `--ext ${ext ? ext.toString() : EXTENSIONS.toString()}`, '"--fix"'], verbose);
     }
   }
