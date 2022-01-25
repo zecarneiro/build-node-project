@@ -1,7 +1,4 @@
 #!/usr/bin/env node
-/*
-  Dependencies: npm i --save-dev yargs fs-extra webpack webpack-cli ts-loader
-*/
 'use strict';
 const main = () => {
   var packages = {
@@ -11,6 +8,7 @@ const main = () => {
     childProcess: null,
     path: null,
     os: null,
+    webpackShebangPlugin: null,
   };
   var pwd = process.cwd();
 
@@ -57,9 +55,14 @@ const main = () => {
     packages.childProcess = require('child_process');
     packages.path = require('path');
     packages.os = require('os');
+    packages.webpackShebangPlugin = require('webpack-shebang-plugin');
   } catch (error) {
-    printMessage('Dependencies packages: \"yargs fs-extra webpack webpack-cli ts-loader\"', 3, true);
+    printMessage('Dependencies install commands:', 3, true);
+    printMessage('npm install --save yargs fs-extra, If yargs and fs-extra not important, please change --save to --save-dev', 3, true);
+    printMessage('npm install --save-dev webpack webpack-cli webpack-shebang-plugin ts-loader', 3, true);
     exit(1);
+
+    // --save-dev yargs fs-extra 
   }
 
   const BIN_PATH = packages.path.resolve(pwd, 'dist');
@@ -80,43 +83,45 @@ const main = () => {
     }
   };
 
-  var getWebpackConfig = (mode, entryPoint, binPath, binName, excludeRule, extensions, loader) => {
+  var getWebpackConfig = (mode, entryPoint, binPath, binName, excludeRule, extensions, isConsoleApp, loader) => {
     binPath = !binPath ? BIN_PATH : binPath;
     binName = !binName ? BIN_NAME : binName;
     excludeRule = !excludeRule ? EXCLUDE_RULE : excludeRule;
-    extensions = !extensions ? EXTENSIONS.map(ext => '.' + ext) : extensions.map(ext => '.' + ext);
+    extensions = !extensions ? EXTENSIONS.map(ext => `.${ext}`) : extensions.map(ext => `.${ext}`);
     loader = !loader ? 'ts-loader' : loader;
-    const fileName = getTempFileDir('webpack.config.js');
-    const config = {
-      target: 'node',
-      mode: mode,
-      entry: packages.path.resolve(pwd, entryPoint),
-      output: {
-        path: binPath,
-        filename: binName,
-        libraryTarget: 'commonjs2'
-      },
-      devtool: 'source-map',
-      externals: {
-        vscode: 'commonjs vscode' // the vscode-module is created on-the-fly and must be excluded. Add other modules that cannot be webpack'ed, 📖 -> https://webpack.js.org/configuration/externals/
-      },
-      resolve: {
-        extensions: extensions
-      },
-      module: {
-        rules: [
+    const fileName = packages.path.resolve(`${pwd}/webpack.config.js`);
+    writeFile(fileName, `
+${isConsoleApp ? 'const ShebangPlugin = require("webpack-shebang-plugin");' : ''}
+module.exports = {
+  target: 'node',
+  mode: '${mode}',
+  entry: ${objToString(packages.path.resolve(pwd, entryPoint))},
+  output: {
+    path: ${objToString(binPath)},
+    filename: '${binName}',
+    libraryTarget: 'commonjs2',
+  },
+  devtool: 'source-map',
+  externals: {
+    vscode: 'commonjs vscode', // the vscode-module is created on-the-fly and must be excluded. Add other modules that cannot be webpack'ed, 📖 -> https://webpack.js.org/configuration/externals/
+  },
+  resolve: {
+    extensions: ${objToString(extensions)},
+  },
+  module: {
+    rules: [
+      {
+        exclude: ${objToString(excludeRule)},
+        use: [
           {
-            exclude: excludeRule,
-            use: [
-              {
-                loader: loader
-              }
-            ]
+            loader: '${loader}',
           }
         ]
       }
-    };
-    writeFile(fileName, `module.exports = ${objToString(config)}`);
+    ]
+  },
+  plugins: ${isConsoleApp ? '[new ShebangPlugin()]' : '[]'},
+};`);
     return ['webpack', '--progress', '--config', fileName];
   }
 
@@ -140,13 +145,14 @@ const main = () => {
       return args.positional('mode', {
         describe: 'Type of build',
         choices: ['production', 'development'],
-      }).option('excludeRule', { type: 'array',  });
+      }).option('excludeRule', { type: 'array' })
+      .option('isConsoleApp', { type: 'boolean' });
     }, (argv) => {
       cleanBin(argv.binPath);
       lintFix(argv.lintFix, null, argv.verbose);
       if (argv.mode === 'production' || argv.mode === 'development') {
         printMessage(`Build ${argv.mode} mode`, 1, true);
-        exeCmd('npx', getWebpackConfig(argv.mode, argv.entryPoint, argv.binPath, argv.binName, argv.rule, argv.extensions), argv.verbose);
+        exeCmd('npx', getWebpackConfig(argv.mode, argv.entryPoint, argv.binPath, argv.binName, argv.rule, argv.extensions, argv.isConsoleApp), argv.verbose);
       } else {
         printMessage('Invalid Option', 3, true);
       }
