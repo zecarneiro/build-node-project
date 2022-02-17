@@ -9,6 +9,7 @@ const main = () => {
     path: null,
     os: null,
     webpackShebangPlugin: null,
+    dotenvWebpack: null,
   };
   var pwd = process.cwd();
 
@@ -56,10 +57,11 @@ const main = () => {
     packages.path = require('path');
     packages.os = require('os');
     packages.webpackShebangPlugin = require('webpack-shebang-plugin');
+    packages.dotenvWebpack = require('dotenv-webpack');
   } catch (error) {
     printMessage('Dependencies install commands:', 3, true);
     printMessage('npm install --save yargs fs-extra, If yargs and fs-extra not important, please change --save to --save-dev', 3, true);
-    printMessage('npm install --save-dev webpack webpack-cli webpack-shebang-plugin ts-loader', 3, true);
+    printMessage('npm install --save-dev webpack webpack-cli webpack-shebang-plugin ts-loader dotenv-webpack', 3, true);
     exit(1);
 
     // --save-dev yargs fs-extra 
@@ -92,6 +94,7 @@ const main = () => {
     const fileName = packages.path.resolve(`${pwd}/webpack.config.js`);
     writeFile(fileName, `
 ${isConsoleApp ? 'const ShebangPlugin = require("webpack-shebang-plugin");' : ''}
+const Dotenv = require('dotenv-webpack');
 module.exports = {
   target: 'node',
   mode: '${mode}',
@@ -120,7 +123,10 @@ module.exports = {
       }
     ]
   },
-  plugins: ${isConsoleApp ? '[new ShebangPlugin()]' : '[]'},
+  plugins: [
+    new Dotenv(),
+    ${isConsoleApp ? 'new ShebangPlugin()' : ''},
+  ]
 };`);
     return ['webpack', '--progress', '--config', fileName];
   }
